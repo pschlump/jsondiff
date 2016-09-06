@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"reflect"
 	"sort"
 
@@ -81,6 +82,28 @@ func Compare(a, b interface{}) Diff {
 
 	jsonA, _ := json.Marshal(a)
 	jsonB, _ := json.Marshal(b)
+
+	json.Unmarshal(jsonA, &mapA)
+	json.Unmarshal(jsonB, &mapB)
+
+	return compareStringMaps(mapA, mapB)
+}
+
+// PJS added
+func CompareFiles(afn, bfn string) Diff {
+	jsonA, aErr := ioutil.ReadFile(afn)
+	if aErr != nil {
+		fmt.Printf("Unable to open %s, error=%s\n", afn, aErr)
+		return Diff{hasDiff: true}
+	}
+	jsonB, bErr := ioutil.ReadFile(bfn)
+	if bErr != nil {
+		fmt.Printf("Unable to open %s, error=%s\n", bfn, bErr)
+		return Diff{hasDiff: true}
+	}
+
+	mapA := map[string]interface{}{}
+	mapB := map[string]interface{}{}
 
 	json.Unmarshal(jsonA, &mapA)
 	json.Unmarshal(jsonB, &mapB)
