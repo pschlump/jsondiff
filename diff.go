@@ -13,9 +13,6 @@ import (
 	"github.com/pschlump/godebug"
 )
 
-// TODO
-// 1. Implement CompareMemToFile
-
 // ResolutionType defines a type of comparison: equality, non-equality,
 // new sub-diff and so on
 type ResolutionType int
@@ -44,6 +41,23 @@ type Diff struct {
 	isArray bool       //
 	Err     error      // error message if any (can't unmarsal into ...)
 	HasDiff bool       // True if there is a difference or error makes it impossible to check
+}
+
+// String allows for printing of ResolutionType as a name
+func (rt ResolutionType) String() string {
+	switch rt {
+	case TypeEquals:
+		return "TypeEquals"
+	case TypeNotEquals:
+		return "TypeNotEquals"
+	case TypeAdded:
+		return "TypeAdded"
+	case TypeRemoved:
+		return "TypeRemoved"
+	case TypeDiff:
+		return "TypeDiff"
+	}
+	return "--internal error--"
 }
 
 // Items returns list of diff items
@@ -163,6 +177,65 @@ func CompareFiles(afn, bfn string) Diff {
 		return Diff{HasDiff: false}
 	} else if errA != nil {
 		fmt.Printf("Unable to parse %s, error=%s\n", afn, errA)
+		return Diff{HasDiff: true}
+	} else if errB != nil {
+		fmt.Printf("Unable to parse %s, error=%s\n", bfn, errB)
+		return Diff{HasDiff: true}
+	}
+
+	return compareStringMaps(mapA, mapB)
+}
+
+// CompareMemToFile compares an in memory structure to a file.  The primary intended
+// use for this is in testing code where an in-memory structure has been created
+// and a correct reference copy is in a directory on disk.
+//
+//  d := jsondiff.Compare ( inMem, "./testdir/test1.json" )
+//	if d.HasDiff {
+//		t.Error ( "failed to pass test1" )
+//	}
+//
+func CompareMemToFile(a interface{}, bfn string) Diff {
+	jsonA, errA := json.Marshal(a)
+	if errA != nil {
+		return Diff{HasDiff: true, Err: errA}
+	}
+	jsonB, bErr := ioutil.ReadFile(bfn)
+	if bErr != nil {
+		fmt.Printf("Unable to open %s, error=%s\n", bfn, bErr)
+		return Diff{HasDiff: true}
+	}
+
+	mapA := map[string]interface{}{}
+	mapB := map[string]interface{}{}
+	arrA := []interface{}{}
+	arrB := []interface{}{}
+
+	errA = json.Unmarshal(jsonA, &mapA)
+	if errA != nil {
+		if db1 {
+			fmt.Printf("1st errA = %s, %s\n", errA, godebug.LF())
+		}
+		errA = json.Unmarshal(jsonA, &arrA)
+		errB := json.Unmarshal(jsonB, &arrB)
+		if errA != nil {
+			fmt.Printf("Unable to parse generated JSON, error=%s\n", errA)
+			return Diff{HasDiff: true}
+		}
+		if errB != nil {
+			fmt.Printf("Unable to parse %s, error=%s\n", bfn, errB)
+			return Diff{HasDiff: true}
+		}
+		rv := compareArrays(arrA, arrB)
+		rv.isArray = true
+		return rv
+	}
+	errB := json.Unmarshal(jsonB, &mapB)
+	if errA != nil && errB != nil {
+		fmt.Printf("Neither %s nor %s are in JSON format, %s, %s\n", errA, errB)
+		return Diff{HasDiff: false}
+	} else if errA != nil {
+		fmt.Printf("Unable to parse generated JSON, error=%s\n", errA)
 		return Diff{HasDiff: true}
 	} else if errB != nil {
 		fmt.Printf("Unable to parse %s, error=%s\n", bfn, errB)

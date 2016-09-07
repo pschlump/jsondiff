@@ -6,9 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TODO
-// 1. Add to tests compare of arrays, both same and different
-
 func TestDiffDifferent(t *testing.T) {
 	mapA := map[string]interface{}{
 		"fieldA": 12,
@@ -280,4 +277,35 @@ func TestDiffEquals(t *testing.T) {
 
 	assert.Equal(t, expected, actual.Items())
 	assert.True(t, actual.IsEqual())
+}
+
+func TestCompareFiles(t *testing.T) {
+	d := CompareFiles("./testdata/t1.json", "./testdata/ref1.json")
+	if d.HasDiff {
+		t.Errorf("Test 1: CompareFiles - found difference where none should exist")
+	}
+	d = CompareFiles("./testdata/t1.json", "./testdata/nonexistent.json")
+	if !d.HasDiff {
+		t.Errorf("Test 2: CompareFiles - returned true when comparing to non-existent file")
+	}
+	d = CompareFiles("./testdata/t1.json", "./testdata/t2.json")
+	if !d.HasDiff {
+		t.Errorf("Test 3: CompareFiles - returned true when comparing files that are different")
+	}
+}
+
+func TestMemToCompareFile(t *testing.T) {
+	t1 := []string{"a", "b", "c"}
+	d := CompareMemToFile(t1, "./testdata/ref1.json")
+	if d.HasDiff {
+		t.Errorf("Test 1: CompareMemToFile - found difference where none should exist")
+	}
+	d = CompareMemToFile(t1, "./testdata/nonexistent.json")
+	if !d.HasDiff {
+		t.Errorf("Test 2: CompareMemToFile - returned true when comparing to non-existent file")
+	}
+	d = CompareMemToFile(t1, "./testdata/t2.json")
+	if !d.HasDiff {
+		t.Errorf("Test 3: CompareMemToFile - returned true when comparing files that are different")
+	}
 }
