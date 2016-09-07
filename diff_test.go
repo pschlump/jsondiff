@@ -6,6 +6,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// TODO
+// 1. Add to tests compare of arrays, both same and different
+
 func TestDiffDifferent(t *testing.T) {
 	mapA := map[string]interface{}{
 		"fieldA": 12,

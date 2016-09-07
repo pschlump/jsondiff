@@ -13,6 +13,9 @@ import (
 	"github.com/pschlump/godebug"
 )
 
+// TODO
+// 1. Implement CompareMemToFile
+
 // ResolutionType defines a type of comparison: equality, non-equality,
 // new sub-diff and so on
 type ResolutionType int
@@ -37,9 +40,10 @@ var (
 // Diff is a result of comparison operation. Provides list
 // of items that describe difference between objects piece by piece
 type Diff struct {
-	items   []DiffItem
-	isArray bool
-	hasDiff bool
+	items   []DiffItem //
+	isArray bool       //
+	Err     error      // error message if any (can't unmarsal into ...)
+	HasDiff bool       // True if there is a difference or error makes it impossible to check
 }
 
 // Items returns list of diff items
@@ -49,14 +53,14 @@ func (d Diff) Items() []DiffItem { return d.items }
 func (d *Diff) Add(item DiffItem) {
 	d.items = append(d.items, item)
 	if item.Resolution != TypeEquals {
-		d.hasDiff = true
+		d.HasDiff = true
 	}
 }
 
 // IsEqual checks if given diff objects does not contain any non-equal
 // element. When IsEqual returns "true" that means there is no difference
 // between compared objects
-func (d Diff) IsEqual() bool { return !d.hasDiff }
+func (d Diff) IsEqual() bool { return !d.HasDiff }
 
 func (d *Diff) sort() { sort.Sort(byKey(d.items)) }
 
@@ -78,31 +82,55 @@ func (m byKey) Swap(i, j int)      { m[i], m[j] = m[j], m[i] }
 // objects "a" and "b".
 // Note: if objects are equal, all diff items will have Resolution of
 // type TypeEquals
-// PJS -- modify to take arrays
 func Compare(a, b interface{}) Diff {
 	mapA := map[string]interface{}{}
 	mapB := map[string]interface{}{}
 
-	jsonA, _ := json.Marshal(a) // xyzzy modify to catch and use errors
-	jsonB, _ := json.Marshal(b)
+	jsonA, errA := json.Marshal(a)
+	if errA != nil {
+		return Diff{HasDiff: true, Err: errA}
+	}
+	jsonB, errB := json.Marshal(b)
+	if errB != nil {
+		return Diff{HasDiff: true, Err: errB}
+	}
 
-	json.Unmarshal(jsonA, &mapA)
-	json.Unmarshal(jsonB, &mapB)
+	errA = json.Unmarshal(jsonA, &mapA)
+	if errA != nil {
+		arrA := []interface{}{}
+		arrB := []interface{}{}
+		errA = json.Unmarshal(jsonA, &arrA)
+		if errA != nil {
+			return Diff{HasDiff: true, Err: errA}
+		}
+		errB := json.Unmarshal(jsonB, &arrB)
+		if errB != nil {
+			return Diff{HasDiff: true, Err: errB}
+		}
+		rv := compareArrays(arrA, arrB)
+		rv.isArray = true
+		return rv
+	}
+	errB = json.Unmarshal(jsonB, &mapB)
+	if errB != nil {
+		return Diff{HasDiff: true, Err: errB}
+	}
 
 	return compareStringMaps(mapA, mapB)
 }
 
-// PJS added
+// CompareFiels will read in 2 files, hopefully both JSON, and
+// perform the compare on them.
 func CompareFiles(afn, bfn string) Diff {
 	jsonA, aErr := ioutil.ReadFile(afn)
 	if aErr != nil {
 		fmt.Printf("Unable to open %s, error=%s\n", afn, aErr)
-		return Diff{hasDiff: true}
+		return Diff{HasDiff: true}
 	}
 	jsonB, bErr := ioutil.ReadFile(bfn)
 	if bErr != nil {
 		fmt.Printf("Unable to open %s, error=%s\n", bfn, bErr)
-		return Diff{hasDiff: true}
+		return Diff{HasDiff: true}
 	}
 
 	mapA := map[string]interface{}{}
@@ -112,16 +140,18 @@ func CompareFiles(afn, bfn string) Diff {
 
 	errA := json.Unmarshal(jsonA, &mapA)
 	if errA != nil {
-		fmt.Printf("1st errA = %s, %s\n", errA, godebug.LF())
+		if db1 {
+			fmt.Printf("1st errA = %s, %s\n", errA, godebug.LF())
+		}
 		errA = json.Unmarshal(jsonA, &arrA)
 		errB := json.Unmarshal(jsonB, &arrB)
 		if errA != nil {
 			fmt.Printf("Unable to parse %s, error=%s\n", afn, errA)
-			return Diff{hasDiff: true}
+			return Diff{HasDiff: true}
 		}
 		if errB != nil {
 			fmt.Printf("Unable to parse %s, error=%s\n", bfn, errB)
-			return Diff{hasDiff: true}
+			return Diff{HasDiff: true}
 		}
 		rv := compareArrays(arrA, arrB)
 		rv.isArray = true
@@ -130,13 +160,13 @@ func CompareFiles(afn, bfn string) Diff {
 	errB := json.Unmarshal(jsonB, &mapB)
 	if errA != nil && errB != nil {
 		fmt.Printf("Neither %s nor %s are in JSON format, %s, %s\n", errA, errB)
-		return Diff{hasDiff: false}
+		return Diff{HasDiff: false}
 	} else if errA != nil {
 		fmt.Printf("Unable to parse %s, error=%s\n", afn, errA)
-		return Diff{hasDiff: true}
+		return Diff{HasDiff: true}
 	} else if errB != nil {
 		fmt.Printf("Unable to parse %s, error=%s\n", bfn, errB)
-		return Diff{hasDiff: true}
+		return Diff{HasDiff: true}
 	}
 
 	return compareStringMaps(mapA, mapB)
@@ -326,3 +356,5 @@ func sortedKeys(m map[string]interface{}) []string {
 
 	return keys
 }
+
+const db1 = false
