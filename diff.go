@@ -10,6 +10,7 @@ import (
 	"sort"
 
 	"github.com/mgutz/ansi"
+	"github.com/pschlump/godebug"
 )
 
 // ResolutionType defines a type of comparison: equality, non-equality,
@@ -37,6 +38,7 @@ var (
 // of items that describe difference between objects piece by piece
 type Diff struct {
 	items   []DiffItem
+	isArray bool
 	hasDiff bool
 }
 
@@ -76,11 +78,12 @@ func (m byKey) Swap(i, j int)      { m[i], m[j] = m[j], m[i] }
 // objects "a" and "b".
 // Note: if objects are equal, all diff items will have Resolution of
 // type TypeEquals
+// PJS -- modify to take arrays
 func Compare(a, b interface{}) Diff {
 	mapA := map[string]interface{}{}
 	mapB := map[string]interface{}{}
 
-	jsonA, _ := json.Marshal(a)
+	jsonA, _ := json.Marshal(a) // xyzzy modify to catch and use errors
 	jsonB, _ := json.Marshal(b)
 
 	json.Unmarshal(jsonA, &mapA)
@@ -104,26 +107,59 @@ func CompareFiles(afn, bfn string) Diff {
 
 	mapA := map[string]interface{}{}
 	mapB := map[string]interface{}{}
+	arrA := []interface{}{}
+	arrB := []interface{}{}
 
-	json.Unmarshal(jsonA, &mapA)
-	json.Unmarshal(jsonB, &mapB)
+	errA := json.Unmarshal(jsonA, &mapA)
+	if errA != nil {
+		fmt.Printf("1st errA = %s, %s\n", errA, godebug.LF())
+		errA = json.Unmarshal(jsonA, &arrA)
+		errB := json.Unmarshal(jsonB, &arrB)
+		if errA != nil {
+			fmt.Printf("Unable to parse %s, error=%s\n", afn, errA)
+			return Diff{hasDiff: true}
+		}
+		if errB != nil {
+			fmt.Printf("Unable to parse %s, error=%s\n", bfn, errB)
+			return Diff{hasDiff: true}
+		}
+		rv := compareArrays(arrA, arrB)
+		rv.isArray = true
+		return rv
+	}
+	errB := json.Unmarshal(jsonB, &mapB)
+	if errA != nil && errB != nil {
+		fmt.Printf("Neither %s nor %s are in JSON format, %s, %s\n", errA, errB)
+		return Diff{hasDiff: false}
+	} else if errA != nil {
+		fmt.Printf("Unable to parse %s, error=%s\n", afn, errA)
+		return Diff{hasDiff: true}
+	} else if errB != nil {
+		fmt.Printf("Unable to parse %s, error=%s\n", bfn, errB)
+		return Diff{hasDiff: true}
+	}
 
 	return compareStringMaps(mapA, mapB)
 }
 
 // Format produces formatted output for a diff that can be printed.
-// Uses colourization which may not work with terminals that don't
-// support ASCII colouring (Windows is under question).
+// Uses colorization which may not work with terminals that don't
+// support ASCII coloring (Windows is under question).
 func Format(diff Diff) []byte {
 	buf := bytes.Buffer{}
 
-	writeItems(&buf, "", diff.Items())
+	writeItems(&buf, "", diff.Items(), diff.isArray)
 
 	return buf.Bytes()
 }
 
-func writeItems(writer io.Writer, prefix string, items []DiffItem) {
-	writer.Write([]byte{'{'})
+// xyzzy - error in output, need to see if array, or hash at top
+func writeItems(writer io.Writer, prefix string, items []DiffItem, isArray bool) {
+	if isArray {
+		writer.Write([]byte{'['})
+	} else {
+		writer.Write([]byte{'{'})
+	}
 	last := len(items) - 1
 
 	prefixNotEqualsA := prefix + "<> "
@@ -136,27 +172,27 @@ func writeItems(writer io.Writer, prefix string, items []DiffItem) {
 
 		switch item.Resolution {
 		case TypeEquals:
-			writeItem(writer, prefix, item.Key, item.ValueA, i < last)
+			writeItem(writer, prefix, item.Key, item.ValueA, i < last, isArray)
 		case TypeNotEquals:
 			writer.Write([]byte(colorStartYellow))
 
-			writeItem(writer, prefixNotEqualsA, item.Key, item.ValueA, i < last)
+			writeItem(writer, prefixNotEqualsA, item.Key, item.ValueA, i < last, isArray)
 			writer.Write([]byte{'\n'})
-			writeItem(writer, prefixNotEqualsB, item.Key, item.ValueB, i < last)
+			writeItem(writer, prefixNotEqualsB, item.Key, item.ValueB, i < last, isArray)
 
 			writer.Write([]byte(colorReset))
 		case TypeAdded:
 			writer.Write([]byte(colorStartGreen))
-			writeItem(writer, prefixAdded, item.Key, item.ValueB, i < last)
+			writeItem(writer, prefixAdded, item.Key, item.ValueB, i < last, isArray)
 			writer.Write([]byte(colorReset))
 		case TypeRemoved:
 			writer.Write([]byte(colorStartRed))
-			writeItem(writer, prefixRemoved, item.Key, item.ValueA, i < last)
+			writeItem(writer, prefixRemoved, item.Key, item.ValueA, i < last, isArray)
 			writer.Write([]byte(colorReset))
 		case TypeDiff:
 			subdiff := item.ValueB.([]DiffItem)
 			fmt.Fprintf(writer, "%s\"%s\": ", prefix, item.Key)
-			writeItems(writer, prefix+indentation, subdiff)
+			writeItems(writer, prefix+indentation, subdiff, false) // xyzzy
 			if i < last {
 				writer.Write([]byte{','})
 			}
@@ -164,11 +200,19 @@ func writeItems(writer io.Writer, prefix string, items []DiffItem) {
 
 	}
 
-	fmt.Fprintf(writer, "\n%s}", prefix)
+	if isArray {
+		fmt.Fprintf(writer, "\n%s]", prefix)
+	} else {
+		fmt.Fprintf(writer, "\n%s}", prefix)
+	}
 }
 
-func writeItem(writer io.Writer, prefix, key string, value interface{}, isNotLast bool) {
-	fmt.Fprintf(writer, "%s\"%s\": ", prefix, key)
+func writeItem(writer io.Writer, prefix, key string, value interface{}, isNotLast bool, isArray bool) {
+	if isArray {
+		fmt.Fprintf(writer, "%s ", prefix)
+	} else {
+		fmt.Fprintf(writer, "%s\"%s\": ", prefix, key)
+	}
 	serialized, _ := json.Marshal(value)
 
 	writer.Write(serialized)

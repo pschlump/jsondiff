@@ -22,8 +22,7 @@ go get github.com/elgris/jsondiff
 ## Limitation
 
 - Coloured output tested with terminals only.  This only works on Mac and Linux.  I will modify this so it works on windows in a few days.
-- The tool converts input data into `map[string]interface{}` with json encoding/decoding. Hence, types of input map will change during unmarshal step: integers become float64 and so on (check https://golang.org/pkg/encoding/json/ for details).   This will also get fixed so that it can
-compare top level arrays.
+- The tool converts input data into `map[string]interface{}` or `[]interface{}` with json encoding/decoding. Hence, types of input map will change during unmarshal step: integers become float64 and so on (check https://golang.org/pkg/encoding/json/ for details).   
 
 ## License
 
