@@ -10,7 +10,7 @@ import (
 	"sort"
 
 	"github.com/mgutz/ansi"
-	"github.com/pschlump/godebug"
+	"github.com/pschlump/dbgo"
 )
 
 // ResolutionType defines a type of comparison: equality, non-equality,
@@ -155,7 +155,7 @@ func CompareFiles(afn, bfn string) Diff {
 	errA := json.Unmarshal(jsonA, &mapA)
 	if errA != nil {
 		if db1 {
-			fmt.Printf("1st errA = %s, %s\n", errA, godebug.LF())
+			dbgo.Printf("1st errA = %s, at:%(LF)\n", errA)
 		}
 		errA = json.Unmarshal(jsonA, &arrA)
 		errB := json.Unmarshal(jsonB, &arrB)
@@ -214,7 +214,7 @@ func CompareMemToFile(a interface{}, bfn string) Diff {
 	errA = json.Unmarshal(jsonA, &mapA)
 	if errA != nil {
 		if db1 {
-			fmt.Printf("1st errA = %s, %s\n", errA, godebug.LF())
+			dbgo.Printf("1st errA = %s, %(LF)\n", errA)
 		}
 		errA = json.Unmarshal(jsonA, &arrA)
 		errB := json.Unmarshal(jsonB, &arrB)
