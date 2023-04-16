@@ -173,7 +173,7 @@ func CompareFiles(afn, bfn string) Diff {
 	}
 	errB := json.Unmarshal(jsonB, &mapB)
 	if errA != nil && errB != nil {
-		fmt.Printf("Neither %s nor %s are in JSON format, %s, %s\n", errA, errB)
+		fmt.Printf("Neither %s nor %s are in JSON format, %s, %s\n", afn, bfn, errA, errB)
 		return Diff{HasDiff: false}
 	} else if errA != nil {
 		fmt.Printf("Unable to parse %s, error=%s\n", afn, errA)
@@ -190,11 +190,10 @@ func CompareFiles(afn, bfn string) Diff {
 // use for this is in testing code where an in-memory structure has been created
 // and a correct reference copy is in a directory on disk.
 //
-//  d := jsondiff.Compare ( inMem, "./testdir/test1.json" )
-//	if d.HasDiff {
-//		t.Error ( "failed to pass test1" )
-//	}
-//
+//	 d := jsondiff.Compare ( inMem, "./testdir/test1.json" )
+//		if d.HasDiff {
+//			t.Error ( "failed to pass test1" )
+//		}
 func CompareMemToFile(a interface{}, bfn string) Diff {
 	jsonA, errA := json.Marshal(a)
 	if errA != nil {
@@ -232,7 +231,7 @@ func CompareMemToFile(a interface{}, bfn string) Diff {
 	}
 	errB := json.Unmarshal(jsonB, &mapB)
 	if errA != nil && errB != nil {
-		fmt.Printf("Neither %s nor %s are in JSON format, %s, %s\n", errA, errB)
+		fmt.Printf("Neither %s nor %s are in JSON format, %s, %s\n", jsonA, bfn, errA, errB)
 		return Diff{HasDiff: false}
 	} else if errA != nil {
 		fmt.Printf("Unable to parse generated JSON, error=%s\n", errA)
