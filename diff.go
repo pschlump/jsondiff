@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/mgutz/ansi"
+	"github.com/pschlump/ansi"
 	"github.com/pschlump/dbgo"
 )
 
